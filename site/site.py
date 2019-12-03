@@ -161,3 +161,23 @@ class Site:
         side effect: site status changes to ON
         """
         self.status = "ON"
+
+
+
+    def unlock(self, transaction, wait_list, block_list):
+        """
+        unlock all the lock made by the target transaction
+        Author: Xinsen Lu
+        input: transaction, wait_list, block_list
+        output: transaction commit(True) or abort(False)
+        side effect: None
+        """ 
+
+    def commit_trans(self, trans_id):
+         """
+        commit all the update made by the target transaction
+        Author: Xinsen Lu
+        input: trans_id
+        output: None
+        side effect: None
+        """ 

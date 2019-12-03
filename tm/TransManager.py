@@ -1,5 +1,5 @@
 from site.site import Site
-
+from trans.transaction import Transaction
 class TransactionManager:
     """
     Transaction Manager
@@ -121,3 +121,26 @@ class TransactionManager:
                 s = self.site_list[i]
         for v in range(2,21,2):
             self.site_list[site_id-1].variable[v-1] = s.variable[v-1]
+    def begin(self, trans_id, trans_type, time):
+        """
+        initialize a target transaction
+        Author: Xinsen Lu
+        input: trans_id, trans_type, time
+        output: True or False
+        side effect: None
+        """
+        newTrans = Transaction(trans_id, trans_type, time)
+        if trans_id in self.trans_list:
+            return False
+        else:
+            self.trans_list[trans_id] = newTrans
+            return True
+    def end(self, site_id):
+        """
+        end a target transaction
+        Author: Xinsen Lu
+        input: trans_id
+        output: transaction commit(True) or abort(Fail)
+        side effect: None
+        """ 
+        

@@ -8,6 +8,7 @@ class Transaction:
         self.type = trans_type  #RW, RO
         self.status = "RUNNING"
         self.time = time
+        self.pendingTx = []
         self.allstatus = ['RUNNING','BLOCKED','ABORTED','COMMITTED']
 
     def get_status(self):
