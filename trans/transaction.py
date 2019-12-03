@@ -7,6 +7,7 @@ class Transaction:
         self.transid = ID       #T1, T2, ...
         self.type = trans_type  #RW, RO
         self.status = "RUNNING"
+        self.ifabort = False
         self.time = time
         self.allstatus = ['RUNNING','BLOCKED','ABORTED','COMMITTED']
 

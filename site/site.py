@@ -41,11 +41,27 @@ class Site:
     """
     read & write
     """
-    def read(self, trans, var):
+    def lock(self, op, trans, var, wait_list, block_list):
+        """
+        check whether a transaction can access a lock
+        the transaction type is RW not RO
+        input: operation, transaction, variable, wait_list, block_list
+        output: True/False
+        side effect: if lock cannot be accessed, add transaction to wait_list and block_list
+        """
+        if trans.type == "RW":
+            return True
+        if op.type == "R":
+            # read operation
+            
+        else: #write operation
+
+
+    def read(self, trans, var, wait_list, block_list):
         """
         read variable from site
         Author: Yiming Li
-        input: transaction ID(string), variable(int)
+        input: transaction ID(string), variable(int), wait_bool(boolean)
         output: operation and variable value
             operation:
                 1: read - successfully read from site, add to locktable if needed
@@ -61,7 +77,24 @@ class Site:
                     version = i
             return 'read', self.pre_version[version][var-1]
         else: #read-write transactions
-            if trans in self.locktable[var][1] and self.locktable[var][0] == 'write':
+            if var not in self.locktable:
+                # no lock on the variable
+                self.locktable[var] = ['read',[trans]]
+                return 'read', self.variable[var-1]
+            else: # has a lock on the variable
+                if self.locktable[var][0] == 'write':
+                    #a write lock
+                    if trans in self.locktable[var][1]:
+                        #transaction already has a write lock on this variable
+                        return 'read', self.buffer[trans][var]
+                    else: #other transaction has the write, wait
+                        if var in wait_list:
+
+                        return 'wait', 0
+                else: #a read lock
+                    if wait_bool:
+                        #exist transaction waiting in wait list
+
                 #already has a write lock on this variable, read directly
                 return 'read', self.buffer[trans][var]
             elif trans not in self.locktable[var][1] and self.locktable[var][0] == 'write':
@@ -70,10 +103,6 @@ class Site:
             elif self.locktable[var][0] == 'read':
                 #share read lock with others
                 self.locktable[var][1].append(trans)
-                return 'read', self.variable[var-1]
-            elif var not in self.locktable:
-                #no lock on the variable
-                self.locktable[var] = ['read',[trans]]
                 return 'read', self.variable[var-1]
 
     def write(self, trans, var, val):

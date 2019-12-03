@@ -13,26 +13,13 @@ class TransactionManager:
         output: None
         side effect: site_list in TM will have all info of 10 sites
         """
-        self.trans_list = dict()    #transaction list
+        self.trans_list = dict()    #{<str:transid>: Transaction}}
         self.site_list = [Site(0)]     #site list
         for i in range(10):
             new_site = Site(i+1)
             self.site_list.append(new_site)
-        self.wait_list = dict() #wait table???
+        self.wait_list = dict() #wait table{<int:variable>:[<str:transid>]}
         self.block_list = dict()
-
-    def find_trans(self, trans_name):
-        """
-        find a transaction by its ID
-        Author: Yiming Li
-        input: transaction ID(string)
-        output: an transaction with the corresponding ID or None
-        side effect: None
-        """
-        for tran in self.trans_list:
-            if trans_name == tran.transid:
-                return tran
-        return None
 
     def dump(self, var = -1):
         """
@@ -97,9 +84,8 @@ class TransactionManager:
         trans_to_abort = self.site_list[site_id - 1].failed()
         print("site {} fails".format(site_id))
         for trans in trans_to_abort:
-            t = self.find_trans(trans)
-            if t is not None:
-                t.set_status("ABORTED")
+            t = self.trans_list[trans]
+            t.ifabort = True
 
     def recover(self, site_id):
         """
@@ -114,10 +100,10 @@ class TransactionManager:
         self.site_list[site_id - 1].recovered()
         print("site {} recovers".format(site_id))
         #use option 1 in transproc slide(page 46) to recover the site
-        for i in range(len(self.site_list)):
-            if i+1 == site_id:
+        for i in range(1,11):
+            if i == site_id:
                 continue
             if self.site_list[i].status == "ON":
                 s = self.site_list[i]
         for v in range(2,21,2):
-            self.site_list[site_id-1].variable[v-1] = s.variable[v-1]
+            self.site_list[site_id].variable[v-1] = s.variable[v-1]
