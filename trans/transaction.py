@@ -9,6 +9,7 @@ class Transaction:
         self.status = "RUNNING"
         self.ifabort = False
         self.time = time
+        self.pendingTx = []
         self.allstatus = ['RUNNING','BLOCKED','ABORTED','COMMITTED']
 
     def get_status(self):
