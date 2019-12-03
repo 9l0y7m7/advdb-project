@@ -201,6 +201,9 @@ class Site:
         output: transaction commit(True) or abort(False)
         side effect: None
         """ 
+        #clean lock
+
+        #
 
     def commit_trans(self, trans_id):
          """

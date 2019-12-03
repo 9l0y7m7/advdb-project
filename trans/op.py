@@ -2,7 +2,7 @@ class Op:
     """
     Operation class
     """
-    def __init__(self, op_ype, var, transaction, value=None):
+    def __init__(self, op_type, var, transaction, value=None):
         self.op_type = op_type
         self.var = var
         self.value = value

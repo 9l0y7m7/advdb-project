@@ -1,3 +1,4 @@
+from trans.op import Op
 class Transaction:
     """
     Transaction class
@@ -9,7 +10,12 @@ class Transaction:
         self.status = "RUNNING"
         self.ifabort = False
         self.time = time
+        self.op = None
         self.allstatus = ["RUNNING","BLOCKED","COMMITTED"]
+
+
+    def update_op(self, op):
+        self.op = op
 
     def get_status(self):
         """
