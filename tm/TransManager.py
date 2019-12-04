@@ -18,8 +18,8 @@ class TransactionManager:
         for i in range(10):
             new_site = Site(i+1)
             self.site_list.append(new_site)
-        self.wait_list = dict() #wait table{<int:variable>:[<str:transid>]}
-        self.block_list = dict()
+        self.wait_list = dict() #wait table{<int:variable>:[transaction id]}
+        self.block_list = dict() #{<str:transid>:set(transid)}
 
     def dump(self, var = -1):
         """
@@ -42,26 +42,31 @@ class TransactionManager:
             for i in range(1,11):
                 self.site_list[i].dump()
 
-    def read(self, trans, var):
-        status = "failed"
-        if var % 2 != 0: #odd variable, read from only one site
-            if self.site_list[var % 10].status == "ON":
-                status, val = self.site_list[var % 10].read(trans, var)
-        else: #even variable, try any up site
-            for i in range(10):
-                if self.site_list[i].status == "ON":
-                    status, val = self.site_list[i].read(trans, var)
-                    if status == 'read':
+    def read(self, transid):
+        """
+        read a value from available sites
+        input: trans id
+        output: the value of the variable
+        side effect: same as the side effec of lock() in Class Site
+        """
+        var = self.trans_list[transid].op.var
+        if var % 2 != 0: #odd variable
+            if self.site_list[var%10+1].status == "ON":
+                if self.site_list[var%10+1].lock(self.trans_list[transid], self.wait_list, self.block_list):
+                    val = self.site_list[var%10+1].variable[var-1]
+                    print("x{}:{}".format(var,val))
+            else:
+                self.trans_list[transid].ifabort = True
+        else: # even variable
+            flag = False
+            for i in range(1,11):
+                if self.site_list[i].status == "ON" and self.site_list[var%10+1].lock(self.trans_list[transid], self.wait_list, self.block_list):
+                        val = self.site_list[i].variable[var-1]
+                        print("x{}:{}".format(var,val))
+                        flag = True
                         break
-        if status == "fail":
-            #fail to read, abort
-            trans.set_status("ABORTED")
-        elif status == "read":
-            #successfully read from site
-            print("x{}: {}".format(var,val))
-        elif status == "wait":
-            #no access to variable, add to waitlist
-            self.wait_list.append(trans)
+            if not flag:
+                self.trans_list[transid].ifabort = True
 
     def write(self, trans, var, val):
         """
