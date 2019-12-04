@@ -241,20 +241,41 @@ class Site:
 
 
 
-    def unlock(self, transaction, wait_list, block_list):
+    def unlock(self, transaction):
         """
         unlock all the lock made by the target transaction
         Author: Xinsen Lu
-        input: transaction, wait_list, block_list
-        output: transaction commit(True) or abort(False)
+        input: transaction
+        output: None
         side effect: None
         """
+        #clean lock
+        id = transaction.transid
+        for key, value in self.locktable.items():
+            if id in value[1]:
+                value[1].remove(id)
+                if len(value[1])==0:
+                    _ = self.locktable.pop(key, None)
+        #clean buffer
+        if transaction.ifabort == False:
+            self.commit_trans(id, transaction.endtime)
+        _ = self.buffer.pop(id, None)
+        return 
 
-    def commit_trans(self, trans_id):
-         """
+    def commit_trans(self, trans_id, time):
+        """
         commit all the update made by the target transaction
         Author: Xinsen Lu
         input: trans_id
         output: None
         side effect: None
-        """
+        """ 
+        #variable update
+        if trans_id in self.buffer:
+            for key, value in self.buffer[trans_id].items():
+                # minus one because variable ranges from 0 to 19 in self.variable
+                self.variable[key-1] = value
+        #pre-version update
+        self.pre_version[time] = []
+        for i in range(len(self.variable)):
+            self.pre_version[time].append(self.variable[i])
