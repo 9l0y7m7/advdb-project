@@ -16,9 +16,9 @@ class Site:
         self.status = "ON" #ON, OFF
         self.version = 0    #commit version????
         self.variable = [None]*20 #variable values
-        self.locktable = dict() #format {<int:variable>:['read/write',[<str:trans id>]]}
+        self.locktable = dict() #format {<int:variable>:['R/W',set(<str:trans id>)]}
         self.buffer = dict() #store the values changed for each transaction before commit
-                            #format{<str:trans id>:[{<int:variable>:<int:value>}]}
+                            #format{<str:trans id>:{<int:variable>:<int:value>...}}
         self.pre_version = dict() #store variable values from previous versions
                                 #format {<int:commit_timestamp>:variable list}
         for i in range(2,21,2):
@@ -41,33 +41,81 @@ class Site:
     """
     read & write
     """
-    def lock(self, op, trans, var, wait_list, block_list):
+    def check_lock(self, trans, wait_list):
         """
-        check whether a transaction can access a lock
-        the transaction type is RW not RO
+        check whether the transaction can get the lock
+        input: transaction, variable, wait_list
+        output: True/False
+        side effect: None
+        """
+        var = trans.op.var
+        if trans.type == "RO":
+            return True
+        else:
+            if var not in locktable:
+                #the variable is not locked
+                if var not in wait_list or len(wait_list[var]) == 0:
+                    return True
+
+                else:
+                    return False
+            else:
+                #variable has a lock
+                if self.locktable[var][0] == "read":
+                    #has a read lock
+                    continue
+                else: # has a write lock
+                    if trans in self.locktable[var][1]:
+                        #already has a write lock
+                        return True
+                    else:
+                        return False
+
+    def lock(self, trans, wait_list, block_list):
+        """
+        access a lock or add to wait_list and block_list
         input: operation, transaction, variable, wait_list, block_list
         output: True/False
         side effect: if lock cannot be accessed, add transaction to wait_list and block_list
+            otherwise access the lock
         """
-        if trans.type == "RW":
+        var = trans.op.var
+        if check_lock(trans, list):
+            #can access lock
+            if trans.transid in wait_list[var]:
+                wait_list[var].pop(0)
+            #add lock to locktable
+            if var not in self.locktable:
+                self.locktable[var] = [trans.op.op_type,[trans.transid]]
+            else:
+                if trans.transid not in self.locktable[var][1]:
+                    self.locktable[var][1].add(trans.transid)
             return True
-        if op.type == "R":
-            # read operation
-            
-        else: #write operation
-
+        else:
+            #cannot access lock, add to wait list and block list
+            if trans.transid not in wait_list[var]:
+                wait_list[var].append(trans.transid)
+            if trans.transid in block_list:
+                for i in self.locktable[var][1]:
+                    block_list[trans.transid].add(i)
+            else:
+                block_list[trans.trans_id] = {}
+                for i in self.locktable[var][1]:
+                    block_list[trans.transid].add(i)
+            return False
 
     def read(self, trans, var, wait_list, block_list):
         """
         read variable from site
         Author: Yiming Li
-        input: transaction ID(string), variable(int), wait_bool(boolean)
+        input: transaction, variable(int), wait_bool(boolean)
         output: operation and variable value
             operation:
                 1: read - successfully read from site, add to locktable if needed
                 2: wait - cannot access read lock, add to wait list
         side effect: None
         """
+
         #read-only transaction reads from previous commit
         if trans.type == "RO":
             #read from last commit, no lock required
@@ -200,7 +248,7 @@ class Site:
         input: transaction, wait_list, block_list
         output: transaction commit(True) or abort(False)
         side effect: None
-        """ 
+        """
 
     def commit_trans(self, trans_id):
          """
@@ -209,4 +257,4 @@ class Site:
         input: trans_id
         output: None
         side effect: None
-        """ 
+        """
