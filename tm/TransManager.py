@@ -123,7 +123,25 @@ class TransactionManager:
         else:
             self.trans_list[trans_id] = newTrans
             return True
-    def end(self, site_id):
+    def resume(self, trans_id):
+        """
+        resume a target transaction
+        Author: Xinsen Lu
+        input: trans_id
+        output: None
+        side effect: None
+        """
+        trans = self.trans_list[trans_id]
+        op = trans.op
+        if op != None:
+            if op.op_type == "R":
+                self.read(trans_id)
+            else:
+                self.write(trans_id)
+        return
+    
+    
+    def end(self, trans_id, time):
         """
         end a target transaction
         Author: Xinsen Lu
@@ -131,3 +149,61 @@ class TransactionManager:
         output: transaction commit(True) or abort(Fail)
         side effect: None
         """
+        trans = self.trans_list[trans_id] 
+        trans.endtime = time
+        #unlock
+        for i in range(1, 11):
+            self.site_list[i].unlock(trans)
+
+        #clear block_list
+        resume_list = []
+        for key, value in self.block_list.items():
+            if trans_id in value:
+                self.block_list[key].remove(trans_id)
+                if len(self.block_list[key])==0:
+                    resume_list.append(key)
+
+        #resume 
+        for item in resume_list:
+            for key, value in self.wait_list.items():
+                if len(value)>0 and value[0] == item:
+                    self.resume(item)
+        return not trans.ifabort
+
+    def detect_deadlock(self):
+        """
+        detect a deadlock
+        Author: Xinsen Lu
+        input: None
+        output: trans_id or ""
+        side effect: None
+        """
+        outdeg = {}
+        edges = {}
+        for key in self.trans_list:
+            outdeg[key] = 0
+        for key, item in self.block_list.items():
+            outdeg[key] = len(item)
+            for ele in item:
+                if ele not in edges:
+                    edges[ele] = []
+                edges[ele].append(key)
+        q = []
+        for key, item in outdeg.items():
+            if item == 0:
+                q.append(key)
+        while len(q) >0:
+            tmp = q.pop(0)
+            for item in edges[tmp]:
+                outdeg[item]-=1
+                if outdeg[item]==0:
+                    q.append(item)
+        res = ""
+        for key, item in outdeg.items():
+            if item != 0:
+                if len(res) == 0:
+                    res = key
+                else:
+                    if self.trans_list[key].time > self.trans_list[res].time:
+                        res = key
+        return res
