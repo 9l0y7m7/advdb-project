@@ -47,35 +47,103 @@ class TransactionManager:
         read a value from available sites
         input: trans id
         output: the value of the variable
-        side effect: same as the side effec of lock() in Class Site
+        side effect: access lock, or add to wait_list and block_list
         """
         var = self.trans_list[transid].op.var
-        if var % 2 != 0: #odd variable
-            if self.site_list[var%10+1].status == "ON":
-                if self.site_list[var%10+1].lock(self.trans_list[transid], self.wait_list, self.block_list):
-                    val = self.site_list[var%10+1].variable[var-1]
-                    print("x{}:{}".format(var,val))
-            else:
-                self.trans_list[transid].ifabort = True
-        else: # even variable
-            flag = False
+        if self.trans_list[transid].type == "RO":
+            #read only transaction
+            roval = -1
             for i in range(1,11):
-                if self.site_list[i].status == "ON" and self.site_list[var%10+1].lock(self.trans_list[transid], self.wait_list, self.block_list):
+                if self.site_list[i].status == "ON":
+                    if self.site_list[i].variable[var-1] == None:
+                        continue
+                    else:
+                        keys = list(self.site_list[var%10+1].pre_version.keys())
+                        for j in reversed(keys):
+                            if j < self.trans_list[transid].time:
+                                key = j
+                                break
+                        roval = self.site_list[var%10+1].pre_version[key][var-1]
+                        break
+            if roval == -1:
+                self.trans_list[transid].ifabort = True
+            else:
+                print("x{}:{}".format(var,roval))
+        else: #read write transaction
+            if var % 2 != 0: #odd variable
+                if self.site_list[var%10+1].status == "ON":
+                    if self.site_list[var%10+1].lock(self.trans_list[transid], self.wait_list, self.block_list):
+                        val = self.site_list[var%10+1].variable[var-1]
+                    print("x{}:{}".format(var,val))
+                else:
+                    self.trans_list[transid].ifabort = True
+            else: # even variable
+                flag = False
+                for i in range(1,11):
+                    if self.site_list[i].status == "ON" and self.site_list[var%10+1].lock(self.trans_list[transid], self.wait_list, self.block_list):
                         val = self.site_list[i].variable[var-1]
                         print("x{}:{}".format(var,val))
                         flag = True
                         break
-            if not flag:
-                self.trans_list[transid].ifabort = True
+                if not flag:
+                    self.trans_list[transid].ifabort = True
 
-    def write(self, trans, var, val):
+    def write(self, transid, val):
         """
-        check write operation from site.write() and finish writing procedure
-        input: transaction ID(string), variable(int), value(int)
+        write a value to a variable, or cannot access lock
+        input: transaction ID(string), value(int)
         output: None
-        side effect: value written to site buffer, update wait list
+        side effect: value written to buffer, or add to wait_list and block_list
         """
-
+        var = self.trans_list[transid].op.var
+        val = self.trans_list[transid].op.value
+        add_buf = {}
+        add_buf[var] = val
+        if var % 2 != 0: #odd variable
+            if self.site_list[var%10+1].status == "ON":
+                if self.site_list[var%10+1].lock(self.trans_list[transid], self.wait_list, self.block_list):
+                    if transid not in self.site_list[var%10+1].buffer:#???
+                        self.site_list[var%10+1].buffer[transid] = {}
+                        self.site_list[var%10+1].buffer[transid] = add_buf
+                    else:
+                        self.site_list[var%10+1].buffer[transid].add(var, val)
+            else:
+                self.trans_list[transid].ifabort = True
+        else: #even variable
+            flag = True
+            index = 0
+            for i in range(1,11):
+                if self.site_list[i].status == "OFF":
+                    continue
+                else:
+                    if not self.site_list[i].check_lock(self.trans_list[transid], self.wait_list):
+                        flag = False
+                        index = i
+                        break
+            if not flag:
+                #add to wait list and block list
+                if var in self.wait_list:
+                    self.wait_list[var].append(transid)
+                else:
+                    self.wait_list[var] = [transid]
+                if transid in self.block_list:
+                    for i in self.site_list[index].locktable[var][1]:
+                        self.block_list[transid].add(i)
+                else:
+                    self.block_list[transid] = {}
+                    for i in self.site_list[index].locktable[var][1]:
+                        self.block_list[transid].add(i)
+            else:
+                for i in range(1,11):
+                    if self.site_list[i].status == "OFF":
+                        continue
+                    else:
+                        if self.site_list[i].lock(self.trans_list[transid], self.wait_list, self.block_list):
+                            if transid in self.site_list[i].buffer:
+                                self.site_list[i].buffer[transid][var] = val
+                            else:
+                                self.site_list[i].buffer[transid] = {}
+                                self.site_list[i].buffer[transid][var] = val
 
     def fail(self, site_id):
         """
@@ -144,8 +212,8 @@ class TransactionManager:
             else:
                 self.write(trans_id)
         return
-    
-    
+
+
     def end(self, trans_id, time):
         """
         end a target transaction
@@ -154,7 +222,7 @@ class TransactionManager:
         output: transaction commit(True) or abort(Fail)
         side effect: None
         """
-        trans = self.trans_list[trans_id] 
+        trans = self.trans_list[trans_id]
         trans.endtime = time
         #unlock
         for i in range(1, 11):
@@ -168,7 +236,7 @@ class TransactionManager:
                 if len(self.block_list[key])==0:
                     resume_list.append(key)
 
-        #resume 
+        #resume
         for item in resume_list:
             for key, value in self.wait_list.items():
                 if len(value)>0 and value[0] == item:

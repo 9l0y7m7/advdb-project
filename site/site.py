@@ -49,27 +49,27 @@ class Site:
         side effect: None
         """
         var = trans.op.var
-        if trans.type == "RO":
+        if var not in self.locktable:
+            #the variable is not locked
+            if var in wait_list and len(wait_list[var]) != 0 and trans.transid not in wait_list[var]:
+                return False
             return True
         else:
-            if var not in locktable:
-                #the variable is not locked
-                if var not in wait_list or len(wait_list[var]) == 0:
-                    return True
-
-                else:
-                    return False
-            else:
-                #variable has a lock
-                if self.locktable[var][0] == "read":
-                    #has a read lock
-                    continue
-                else: # has a write lock
-                    if trans in self.locktable[var][1]:
-                        #already has a write lock
-                        return True
-                    else:
+            #variable has a lock
+            if self.locktable[var][0] == "R":
+                #has a read lock
+                if trans.op.op_type == "R":
+                    #new op is read
+                    if var in wait_list and len(wait_list[var]) != 0:
                         return False
+                    return True
+                else: # new op is write
+                    return False
+            else: # has a write lock
+                if trans in self.locktable[var][1] and trans.op.op_type == "W":
+                    #already has a write lock
+                    return True
+                return False
 
     def lock(self, trans, wait_list, block_list):
         """
@@ -80,7 +80,7 @@ class Site:
             otherwise access the lock
         """
         var = trans.op.var
-        if check_lock(trans, list):
+        if self.check_lock(trans, wait_list):
             #can access lock
             if trans.transid in wait_list[var]:
                 wait_list[var].pop(0)
@@ -103,44 +103,6 @@ class Site:
                 for i in self.locktable[var][1]:
                     block_list[trans.transid].add(i)
             return False
-
-    def write(self, trans, var, val):
-        """
-        write to a variable in buffer in a site
-        input: transaction ID(string), variable(int), value(int)
-        output:
-            write: successfully write to buffer
-            wait: cannot access write lock, add to wait list
-            read: variable has a read lock, check wait list in TM
-        side effect: buffer changes according to write values
-        """
-        add_buf = dict()
-        add_buf[var] = val
-        if self.locktable[var][0] == 'write' and trans in self.locktable[var][1]:
-            #already has a write lock, write to buffer
-            if trans in self.buffer:
-                self.buffer[trans].append(add_buf)
-            else:
-                self.buffer[trans] = [add_buf]
-            return 'write'
-        elif self.locktable[var][0] == 'write' and trans not in self.locktable[var][1]:
-            #write lock hold by other transaction, wait
-            return 'wait'
-        elif var not in self.locktable:
-            self.locktable[var] = ['write',[trans]]
-            if trans in self.buffer:
-                self.buffer[trans].append(add_buf)
-            else:
-                self.buffer[trans] = [add_buf]
-            return 'write'
-        elif self.locktable[var][0] == 'read' and (trans not in self.locktable[var][1]
-                                                   or (trans in self.locktable[var][1] and len(self.locktable[var][1] != 1))):
-            #read lock hold by other transaction, wait
-            return 'wait'
-        elif self.locktable[var][0] == 'read' and trans in self.locktable[var][1] and len(self.locktable[var][1] == 1):
-            #transaction has read lock, check wait table to see if it can get write lock
-            return 'read'
-
 
     def dump(self):
         """
@@ -211,7 +173,7 @@ class Site:
         if transaction.ifabort == False:
             self.commit_trans(id, transaction.endtime)
         _ = self.buffer.pop(id, None)
-        return 
+        return
 
     def commit_trans(self, trans_id, time):
         """
@@ -220,7 +182,7 @@ class Site:
         input: trans_id
         output: None
         side effect: None
-        """ 
+        """
         #variable update
         if trans_id in self.buffer:
             for key, value in self.buffer[trans_id].items():
