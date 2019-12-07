@@ -2,7 +2,7 @@ from trans.op import Op
 class Transaction:
     """
     Transaction class
-    Author: Yiming Li
+    Author: Yiming Li & Xinsen Lu
     """
     def __init__(self, ID, trans_type, time):
         self.transid = ID       #T1, T2, ...
