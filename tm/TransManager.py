@@ -1,4 +1,4 @@
-from site.site import Site
+from sites.site import Site
 from trans.transaction import Transaction
 from trans.op import Op
 class TransactionManager:
