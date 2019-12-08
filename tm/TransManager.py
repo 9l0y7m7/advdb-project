@@ -122,17 +122,19 @@ class TransactionManager:
                 if self.site_list[var%10+1].status == "ON":
                     if self.site_list[var%10+1].lock(self.trans_list[transid], self.wait_list, self.block_list):
                         val = self.site_list[var%10+1].variable[var-1]
-                    print("x{}:{}".format(var,val))
+                        print("x{}:{}".format(var,val))
                 else:
                     self.trans_list[transid].ifabort = True
             else: # even variable
                 flag = False
                 for i in range(1,11):
-                    if self.site_list[i].status == "ON" and self.site_list[var%10+1].lock(self.trans_list[transid], self.wait_list, self.block_list):
-                        val = self.site_list[i].variable[var-1]
-                        print("x{}:{}".format(var,val))
+                    if self.site_list[i].status =="ON":
                         flag = True
-                        break
+                        if self.site_list[var%10+1].check_lock(self.trans_list[transid], self.wait_list):
+                            self.site_list[var%10+1].lock(self.trans_list[transid], self.wait_list, self.block_list)
+                            val = self.site_list[i].variable[var-1]
+                            print("x{}:{}".format(var,val))
+                            break
                 if not flag:
                     self.trans_list[transid].ifabort = True
 

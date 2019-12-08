@@ -81,15 +81,16 @@ class Site:
         """
         var = trans.op.var
         if self.check_lock(trans, wait_list):
-            #can access lock
-            if trans.transid in wait_list[var]:
-                wait_list[var].pop(0)
             #add lock to locktable
             if var not in self.locktable:
                 self.locktable[var] = [trans.op.op_type,[trans.transid]]
             else:
                 if trans.transid not in self.locktable[var][1]:
                     self.locktable[var][1].add(trans.transid)
+            if var in wait_list:
+                if trans.transid in wait_list[var]:
+                    wait_list[var].pop(0)
+
             return True
         else:
             #cannot access lock, add to wait list and block list
