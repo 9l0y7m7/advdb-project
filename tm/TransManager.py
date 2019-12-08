@@ -1,6 +1,7 @@
 from sites.site import Site
 from trans.transaction import Transaction
 from trans.op import Op
+import collections
 class TransactionManager:
     """
     Transaction Manager
@@ -23,7 +24,19 @@ class TransactionManager:
         self.block_list = dict() #{<str:transid>:set(transid)}
 
     def loadCommand(self, commands):
+         """
+        read iteration commands from 
+        Author: Xinsen Lu
+        input: None
+        output: trans_id or ""
+        side effect: None
+        """
         for index, command in enumerate(commands):
+            if index%2 == 0:
+                res = self.detect_deadlock()
+                if len(res) != 0:
+                    self.trans_list[res].ifabort = True
+                    self.end(res, index)
             operation = command[0]
             args = command[1]
             if operation == "begin":
@@ -37,20 +50,13 @@ class TransactionManager:
                     raise ValueError(
                         "Fail to begin {} from command with transactin id {}.".format(operation,args[0]))
             elif operation == "end":
-                res = self.end(args[0], index)
-                if res:
-                    print("Transaction {} is commited.".format(args[0]))
-                else:
-                    print("Transaction {} is aborted.".format(args[0]))
+                _  = self.end(args[0], index)
             elif operation == "fail":
                 self.fail(args[0])
             elif operation == "recover":
                 self.recover(args[0])
             elif operation == "dump":
-                if len(args) == 0:
-                    self.dump()
-                else:
-                    self.dump(args[0])
+                self.dump()
             elif operation == "R":
                 if len(args) != 2:
                     raise ValueError(
@@ -180,7 +186,7 @@ class TransactionManager:
                     for i in self.site_list[index].locktable[var][1]:
                         self.block_list[transid].add(i)
                 else:
-                    self.block_list[transid] = {}
+                    self.block_list[transid] = set()
                     for i in self.site_list[index].locktable[var][1]:
                         self.block_list[transid].add(i)
             else:
@@ -291,6 +297,10 @@ class TransactionManager:
             for key, value in self.wait_list.items():
                 if len(value)>0 and value[0] == item:
                     self.resume(item)
+        if not trans.ifabort:
+            print("Transaction {} is commited.".format(trans_id))
+        else:
+            print("Transaction {} is aborted.".format(trans_id))
         return not trans.ifabort
 
     def detect_deadlock(self):
@@ -301,8 +311,8 @@ class TransactionManager:
         output: trans_id or ""
         side effect: None
         """
-        outdeg = {}
-        edges = {}
+        outdeg = collections.defaultdict(int)
+        edges = collections.defaultdict(list)
         for key in self.trans_list:
             outdeg[key] = 0
         for key, item in self.block_list.items():

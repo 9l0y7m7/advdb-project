@@ -41,14 +41,17 @@ class fileReader():
 
 
 class streamReader():
-	def __init__(self, stream):
-		self._stream = stream
+    def __init__(self, stream):
+        self._stream = stream
 
-	def __iter__(self):
-		for line in self._stream:
-			command = commandParser(line)
-			if len(command) > 0:
-				yield command 
+    def __iter__(self):
+        for line in self._stream:
+            commands = commandParser(line)
+            if len(commands) > 0:
+                for command in commands:
+                    print(command)
+                    yield command
+
 
 
 
@@ -62,7 +65,7 @@ def main():
     args = parser.parse_args()
     tm = TransactionManager()
     if args.test_file is None:
-        commandIter = streamReader(sys.stdin)._stream
+        commandIter = streamReader(sys.stdin)
     else:
         commandIter = fileReader(args.test_file)
     tm.loadCommand(commandIter)
