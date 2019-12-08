@@ -94,13 +94,14 @@ class Site:
             return True
         else:
             #cannot access lock, add to wait list and block list
-            if trans.transid not in wait_list[var]:
-                wait_list[var].append(trans.transid)
+            if var in wait_list:
+                if trans.transid not in wait_list[var]:
+                    wait_list[var].append(trans.transid)
             if trans.transid in block_list:
                 for i in self.locktable[var][1]:
                     block_list[trans.transid].add(i)
             else:
-                block_list[trans.trans_id] = {}
+                block_list[trans.transid] = set()
                 for i in self.locktable[var][1]:
                     block_list[trans.transid].add(i)
             return False
@@ -165,11 +166,14 @@ class Site:
         """
         #clean lock
         id = transaction.transid
+        keys = []
         for key, value in self.locktable.items():
             if id in value[1]:
                 value[1].remove(id)
                 if len(value[1])==0:
-                    _ = self.locktable.pop(key, None)
+                    keys.append(key)
+        for key in keys:
+            _ =  self.locktable.pop(key, None)
         #clean buffer
         if transaction.ifabort == False:
             self.commit_trans(id, transaction.endtime)
