@@ -173,14 +173,14 @@ class TransactionManager:
         self.site_list[site_id - 1].recovered()
         print("site {} recovers".format(site_id))
         #use option 1 in transproc slide(page 46) to recover the site
-        for i in range(1,11):
-            if i == site_id:
-                continue
-            if self.site_list[i].status == "ON":
-                s = self.site_list[i]
-                break
-        for v in range(2,21,2):
-            self.site_list[site_id-1].variable[v-1] = s.variable[v-1]
+        #for i in range(1,11):
+        #    if i == site_id:
+        #        continue
+        #    if self.site_list[i].status == "ON":
+        #        s = self.site_list[i]
+        #        break
+        #for v in range(2,21,2):
+        #    self.site_list[site_id-1].variable[v-1] = s.variable[v-1]
 
     def begin(self, trans_id, trans_type, time):
         """
