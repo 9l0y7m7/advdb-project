@@ -26,7 +26,7 @@ class Site:
         if self.siteid % 2 == 0:
             self.variable[self.siteid - 2] = (self.siteid - 1) * 10
             self.variable[self.siteid - 2 + 10] = (self.siteid + 10 - 1) * 10
-        self.pre_version[0] = self.variable
+        self.pre_version[0] = [self.variable[i] for i in range(len(self.variable))]
 
     def get_variable(self):
         """
