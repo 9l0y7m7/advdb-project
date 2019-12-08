@@ -16,6 +16,13 @@ class Transaction:
 
 
     def update_op(self, op):
+        """
+        update operation
+        Author: Xinsen Lu
+        input: None
+        output: None
+        side effect: change operation
+        """
         self.op = op
 
     def get_status(self):

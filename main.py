@@ -6,7 +6,13 @@ import sys
 import re
 
 def commandParser(line):
-
+    """
+    parse the command into a tuple (operator, [args..])
+    Author: Xinsen Lu
+    input: line of the command
+    output: list of parsed command
+    side effect: None
+    """
     # ignore comments
     if "//" in line:
         return None
@@ -24,6 +30,13 @@ def commandParser(line):
 
 	
 class fileReader():
+    """
+    file reader
+    Author: Xinsen Lu
+    input: file path
+    output: command iterator
+    side effect: None
+    """
     def __init__(self, file):
         self._file = file
         self._command = []
@@ -41,6 +54,13 @@ class fileReader():
 
 
 class streamReader():
+    """
+    stream reader
+    Author: Xinsen Lu
+    input: None
+    output: command iterator
+    side effect: None
+    """
     def __init__(self, stream):
         self._stream = stream
 

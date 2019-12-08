@@ -24,12 +24,12 @@ class TransactionManager:
         self.block_list = dict() #{<str:transid>:set(transid)}
 
     def loadCommand(self, commands):
-         """
-        read iteration commands from 
+        """
+        read iteration commands from input and call the corresponding function
         Author: Xinsen Lu
-        input: None
-        output: trans_id or ""
-        side effect: None
+        input: command iterator
+        output: None
+        side effect: Depending on inputs it will have different effects
         """
         for index, command in enumerate(commands):
             if index%2 == 0:
@@ -52,9 +52,9 @@ class TransactionManager:
             elif operation == "end":
                 _  = self.end(args[0], index)
             elif operation == "fail":
-                self.fail(args[0])
+                self.fail(int(args[0]))
             elif operation == "recover":
-                self.recover(args[0])
+                self.recover(int(args[0]))
             elif operation == "dump":
                 self.dump()
             elif operation == "R":
@@ -210,7 +210,7 @@ class TransactionManager:
         output: site:<site_id> fails
         side effect: status of transactions from list(trans_to_abort) are set to "ABORTED"
         """
-        trans_to_abort = self.site_list[site_id - 1].failed()
+        trans_to_abort = self.site_list[site_id].failed()
         print("Site {} fails".format(site_id))
         for trans in trans_to_abort:
             t = self.trans_list[trans]
@@ -258,7 +258,7 @@ class TransactionManager:
         Author: Xinsen Lu
         input: trans_id
         output: None
-        side effect: None
+        side effect: self effect as read and write
         """
         trans = self.trans_list[trans_id]
         op = trans.op
@@ -276,7 +276,7 @@ class TransactionManager:
         Author: Xinsen Lu
         input: trans_id
         output: transaction commit(True) or abort(Fail)
-        side effect: None
+        side effect: affact site_list, block_list and wait_list
         """
         trans = self.trans_list[trans_id]
         trans.endtime = time
