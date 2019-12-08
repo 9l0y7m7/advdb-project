@@ -56,14 +56,14 @@ class TransactionManager:
                     raise ValueError(
                         "Not enough args for read.")
                 trans = self.trans_list[args[0]]
-                op = Op("R", args[1], args[0])
+                trans.op = Op("R", int(args[1][1:]), args[0])
                 self.read(args[0])
             elif operation == "W":
                 if len(args) != 3:
                     raise ValueError(
                         "Not enough args for write.")
                 trans = self.trans_list[args[0]]
-                op = Op("W", args[1], args[0], args[2])
+                trans.op = Op("W", int(args[1][1:]), args[0], args[2])
                 self.write(args[0])
             else:
                 raise ValueError(

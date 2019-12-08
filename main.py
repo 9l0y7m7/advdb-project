@@ -29,11 +29,11 @@ class fileReader():
         self._command = []
         self.parse()
     def parse(self):
-        with open(self.file, "r") as f:
+        with open(self._file, "r") as f:
             for _, line in enumerate(f):
                 command = commandParser(line)
                 if command is not None:
-                    self._command.append(command)
+                    self._command.extend(command)
     
     def __iter__(self):
         return iter(self._command)
@@ -62,7 +62,7 @@ def main():
     args = parser.parse_args()
     tm = TransactionManager()
     if args.test_file is None:
-        commandIter = streamReader()
+        commandIter = streamReader(sys.stdin)._stream
     else:
         commandIter = fileReader(args.test_file)
     tm.loadCommand(commandIter)
