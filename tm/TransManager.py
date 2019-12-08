@@ -1,5 +1,6 @@
 from site.site import Site
 from trans.transaction import Transaction
+from trans.op import Op
 class TransactionManager:
     """
     Transaction Manager
@@ -20,6 +21,53 @@ class TransactionManager:
             self.site_list.append(new_site)
         self.wait_list = dict() #wait table{<int:variable>:[transaction id]}
         self.block_list = dict() #{<str:transid>:set(transid)}
+
+    def loadCommand(self, commands):
+        for index, command in enumerate(commands):
+            operation = command[0]
+            args = command[1]
+            if operation == "begin":
+                res = self.begin(args[0], "RW", index)
+                if not res:
+                    raise ValueError(
+                        "Fail to begin {} from command with transactin id {}.".format(operation,args[0]))
+            elif operation == "beginRO":
+                res = self.begin(args[0], "RO", index)
+                if not res:
+                    raise ValueError(
+                        "Fail to begin {} from command with transactin id {}.".format(operation,args[0]))
+            elif operation == "end":
+                res = self.end(args[0], index)
+                if res:
+                    print("Transaction {} is commited.".format(args[0]))
+                else:
+                    print("Transaction {} is aborted.".format(args[0]))
+            elif operation == "fail":
+                self.fail(args[0])
+            elif operation == "recover":
+                self.recover(args[0])
+            elif operation == "dump":
+                if len(args) == 0:
+                    self.dump()
+                else:
+                    self.dump(args[0])
+            elif operation == "R":
+                if len(args) != 2:
+                    raise ValueError(
+                        "Not enough args for read.")
+                trans = self.trans_list[args[0]]
+                op = Op("R", args[1], args[0])
+                self.read(args[0])
+            elif operation == "W":
+                if len(args) != 3:
+                    raise ValueError(
+                        "Not enough args for write.")
+                trans = self.trans_list[args[0]]
+                op = Op("W", args[1], args[0], args[2])
+                self.write(args[0])
+            else:
+                raise ValueError(
+                "Cannot identify operation {} from command".format(operation))
 
     def dump(self, var = -1):
         """
@@ -88,10 +136,10 @@ class TransactionManager:
                 if not flag:
                     self.trans_list[transid].ifabort = True
 
-    def write(self, transid, val):
+    def write(self, transid):
         """
         write a value to a variable, or cannot access lock
-        input: transaction ID(string), value(int)
+        input: transaction ID(string)
         output: None
         side effect: value written to buffer, or add to wait_list and block_list
         """
@@ -155,7 +203,7 @@ class TransactionManager:
         side effect: status of transactions from list(trans_to_abort) are set to "ABORTED"
         """
         trans_to_abort = self.site_list[site_id - 1].failed()
-        print("site {} fails".format(site_id))
+        print("Site {} fails".format(site_id))
         for trans in trans_to_abort:
             t = self.trans_list[trans]
             t.ifabort = True
@@ -171,7 +219,7 @@ class TransactionManager:
                     are read from other up sites
         """
         self.site_list[site_id - 1].recovered()
-        print("site {} recovers".format(site_id))
+        print("Site {} recovers".format(site_id))
         #use option 1 in transproc slide(page 46) to recover the site
         #for i in range(1,11):
         #    if i == site_id:
