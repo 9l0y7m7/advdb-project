@@ -57,7 +57,7 @@ class streamReader():
     """
     stream reader
     Author: Xinsen Lu
-    input: None
+    input: Non
     output: command iterator
     side effect: None
     """
