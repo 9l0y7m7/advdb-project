@@ -83,7 +83,7 @@ class Site:
         if self.check_lock(trans, wait_list):
             #add lock to locktable
             if var not in self.locktable:
-                self.locktable[var] = set([trans.op.op_type,[trans.transid]])
+                self.locktable[var] = [trans.op.op_type,set([trans.transid])]
             else:
                 if trans.transid not in self.locktable[var][1]:
                     self.locktable[var][1].add(trans.transid)
