@@ -22,7 +22,7 @@ class Site:
         self.pre_version = dict() #store variable values from previous versions
                                 #format {<int:commit_timestamp>:variable list}
         self.read_available = [True]*10
-        self.recovered_map = {}
+        self.recovered_map = {} #store variable values with list of transaction
         for i in range(2,21,2):
             self.variable[i-1] = 10*i
         if self.siteid % 2 == 0:
