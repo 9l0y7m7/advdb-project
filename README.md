@@ -40,7 +40,7 @@ reprozip trace python3 main.py -f test/test22
 reprozip trace -continue python3 main.py -f <test file>
 
 ## pack the experiment
-reprozip pack advdbproject
+reprozip pack advdb
 
 ## shut down
 vagrant halt
@@ -66,6 +66,9 @@ python -c "import reprozip"
 ## unzip rpz project
 pip install reprounzip
 
-reprounzip directory setup advdbproject.rpz ~/advDB
+## setup rpz
+reprounzip directory setup advdbproject.rpz ~/advdb
 
+## run
+reprounzip directory run ~/advdb
 ```
