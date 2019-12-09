@@ -20,7 +20,7 @@ class TransactionManager:
         for i in range(10):
             new_site = Site(i+1)
             self.site_list.append(new_site)
-        self.wait_list = dict() #wait table{<int:variable>:[transaction id]}
+        self.wait_list = dict() #wait table{<int:variable>:[transaction]}
         self.block_list = dict() #{<str:transid>:set(transid)}
 
     def loadCommand(self, commands):
@@ -32,11 +32,6 @@ class TransactionManager:
         side effect: Depending on inputs it will have different effects
         """
         for index, command in enumerate(commands):
-            if index%2 == 0:
-                res = self.detect_deadlock()
-                if len(res) != 0:
-                    self.trans_list[res].ifabort = True
-                    self.end(res, index)
             operation = command[0]
             args = command[1]
             if operation == "begin":
@@ -51,6 +46,7 @@ class TransactionManager:
                         "Fail to begin {} from command with transactin id {}.".format(operation,args[0]))
             elif operation == "end":
                 _  = self.end(args[0], index)
+                self.check_deadlock(index)
             elif operation == "fail":
                 self.fail(int(args[0]))
             elif operation == "recover":
@@ -64,6 +60,7 @@ class TransactionManager:
                 trans = self.trans_list[args[0]]
                 trans.op = Op("R", int(args[1][1:]), args[0])
                 self.read(args[0])
+                self.check_deadlock(index)
             elif operation == "W":
                 if len(args) != 3:
                     raise ValueError(
@@ -71,6 +68,7 @@ class TransactionManager:
                 trans = self.trans_list[args[0]]
                 trans.op = Op("W", int(args[1][1:]), args[0], args[2])
                 self.write(args[0])
+                self.check_deadlock(index)
             else:
                 raise ValueError(
                 "Cannot identify operation {} from command".format(operation))
@@ -103,6 +101,8 @@ class TransactionManager:
         output: the value of the variable
         side effect: access lock, or add to wait_list and block_list
         """
+        if self.trans_list[transid].ifabort:
+            return
         var = self.trans_list[transid].op.var
         if self.trans_list[transid].type == "RO":
             #read only transaction
@@ -132,17 +132,34 @@ class TransactionManager:
                 else:
                     self.trans_list[transid].ifabort = True
             else: # even variable
-                flag = False
+                abortFlag = False
+                readFlag = False
+                idx = -1
                 for i in range(1,11):
                     if self.site_list[i].status =="ON":
-                        flag = True
-                        if self.site_list[var%10+1].check_lock(self.trans_list[transid], self.wait_list):
-                            self.site_list[var%10+1].lock(self.trans_list[transid], self.wait_list, self.block_list)
+                        abortFlag = True
+                        if self.site_list[i].check_lock(self.trans_list[transid], self.wait_list):
+                            if self.site_list[i].read_available[(var-1)//2] == False:
+                                idx = i
+                                continue
+                            self.site_list[i].lock(self.trans_list[transid], self.wait_list, self.block_list)
                             val = self.site_list[i].variable[var-1]
                             print("x{}:{}".format(var,val))
+                            readFlag = True
                             break
-                if not flag:
+                if not abortFlag:
                     self.trans_list[transid].ifabort = True
+                    return
+                if not readFlag:
+                    if idx == -1:
+                        for i in range(1,11):
+                            if self.site_list[i].status =="ON":
+                                self.site_list[i].lock(self.trans_list[transid], self.wait_list, self.block_list)
+                                break
+                    else:
+                        if var not in self.site_list[idx].recovered_map:
+                            self.site_list[idx].recovered_map[var] = []
+                        self.site_list[idx].recovered_map[var].append(transid)
 
     def write(self, transid):
         """
@@ -151,8 +168,11 @@ class TransactionManager:
         output: None
         side effect: value written to buffer, or add to wait_list and block_list
         """
+        if self.trans_list[transid].ifabort:
+            return
         var = self.trans_list[transid].op.var
         val = self.trans_list[transid].op.value
+        op_ty  = self.trans_list[transid].op.op_type
         add_buf = {}
         add_buf[var] = val
         if var % 2 != 0: #odd variable
@@ -176,30 +196,30 @@ class TransactionManager:
                         flag = False
                         index = i
                         break
+            # print(self.site_list[index].locktable)
+            # print(flag, index)
             if not flag:
                 #add to wait list and block list
-                if var in self.wait_list:
-                    self.wait_list[var].append(transid)
-                else:
-                    self.wait_list[var] = [transid]
-                if transid in self.block_list:
-                    for i in self.site_list[index].locktable[var][1]:
-                        self.block_list[transid].add(i)
-                else:
-                    self.block_list[transid] = set()
-                    for i in self.site_list[index].locktable[var][1]:
-                        self.block_list[transid].add(i)
+                self.site_list[index].lock(self.trans_list[transid], self.wait_list, self.block_list)
             else:
                 for i in range(1,11):
                     if self.site_list[i].status == "OFF":
                         continue
                     else:
-                        if self.site_list[i].lock(self.trans_list[transid], self.wait_list, self.block_list):
-                            if transid in self.site_list[i].buffer:
-                                self.site_list[i].buffer[transid][var] = val
-                            else:
-                                self.site_list[i].buffer[transid] = {}
-                                self.site_list[i].buffer[transid][var] = val
+                        locktable = self.site_list[i].locktable
+                        if var not in locktable:
+                            locktable[var] = [op_ty,set([transid])]
+                        else:
+                            if transid not in locktable[var][1]:
+                                locktable[var][1].add(transid)
+                        if transid in self.site_list[i].buffer:
+                            self.site_list[i].buffer[transid][var] = val
+                        else:
+                            self.site_list[i].buffer[transid] = {}
+                            self.site_list[i].buffer[transid][var] = val
+                if var in self.wait_list:
+                    if self.trans_list[transid] in self.wait_list[var]:
+                        self.wait_list[var].pop(0)
 
     def fail(self, site_id):
         """
@@ -226,7 +246,8 @@ class TransactionManager:
         side effect: non-replicated variables remain unchanged, replicated variables
                     are read from other up sites
         """
-        self.site_list[site_id - 1].recovered()
+        self.site_list[site_id].recovered()
+        self.site_list[site_id].read_available = [False]*10
         print("Site {} recovers".format(site_id))
         #use option 1 in transproc slide(page 46) to recover the site
         #for i in range(1,11):
@@ -282,8 +303,17 @@ class TransactionManager:
         trans.endtime = time
         #unlock
         for i in range(1, 11):
-            self.site_list[i].unlock(trans)
+            return_list = self.site_list[i].unlock(trans)
+            if return_list != None:
+                for item in return_list:
+                    self.resume(item)
 
+        if not trans.ifabort:
+            print("Transaction {} is commited.".format(trans_id))
+        else:
+            print("Transaction {} is aborted.".format(trans_id))
+        
+        # print(self.block_list)
         #clear block_list
         resume_list = []
         for key, value in self.block_list.items():
@@ -292,16 +322,22 @@ class TransactionManager:
                 if len(self.block_list[key])==0:
                     resume_list.append(key)
 
+        # print(resume_list)
+        # print(self.wait_list)
         #resume
         for item in resume_list:
             for key, value in self.wait_list.items():
-                if len(value)>0 and value[0] == item:
+                if len(value)>0 and value[0].transid == item:
                     self.resume(item)
-        if not trans.ifabort:
-            print("Transaction {} is commited.".format(trans_id))
-        else:
-            print("Transaction {} is aborted.".format(trans_id))
         return not trans.ifabort
+
+
+
+    def check_deadlock(self, index):
+        res = self.detect_deadlock()
+        if len(res) != 0:
+            self.trans_list[res].ifabort = True
+            self.end(res, index)
 
     def detect_deadlock(self):
         """

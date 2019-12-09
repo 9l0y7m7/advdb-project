@@ -24,5 +24,7 @@ R(T2,x2)
 // but doesn't hold a lock on x2 at site 1
 begin(T5)
 W(T5,x2,90)
+end(T5)
 // T5 doesn't need to wait because T2 doesn't acquire a lock
 // since site 1 can't respond to the read.
+dump()

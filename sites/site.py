@@ -21,6 +21,8 @@ class Site:
                             #format{<str:trans id>:{<int:variable>:<int:value>...}}
         self.pre_version = dict() #store variable values from previous versions
                                 #format {<int:commit_timestamp>:variable list}
+        self.read_available = [True]*10
+        self.recovered_map = {}
         for i in range(2,21,2):
             self.variable[i-1] = 10*i
         if self.siteid % 2 == 0:
@@ -51,7 +53,8 @@ class Site:
         var = trans.op.var
         if var not in self.locktable:
             #the variable is not locked
-            if var in wait_list and len(wait_list[var]) != 0 and trans.transid not in wait_list[var]:
+            # print(wait_list)
+            if var in wait_list and len(wait_list[var]) != 0 and trans not in wait_list[var]:
                 return False
             return True
         else:
@@ -64,6 +67,9 @@ class Site:
                         return False
                     return True
                 else: # new op is write
+                    if len(self.locktable[var][1])==1 and trans.transid in self.locktable[var][1]:
+                        if var not in wait_list or len(wait_list[var]) == 0 or (wait_list[var][0]==trans):
+                            return True
                     return False
             else: # has a write lock
                 if trans in self.locktable[var][1] and trans.op.op_type == "W":
@@ -88,22 +94,36 @@ class Site:
                 if trans.transid not in self.locktable[var][1]:
                     self.locktable[var][1].add(trans.transid)
             if var in wait_list:
-                if trans.transid in wait_list[var]:
+                if trans in wait_list[var]:
                     wait_list[var].pop(0)
-
             return True
         else:
-            #cannot access lock, add to wait list and block list
-            if var in wait_list:
-                if trans.transid not in wait_list[var]:
-                    wait_list[var].append(trans.transid)
-            if trans.transid in block_list:
-                for i in self.locktable[var][1]:
-                    block_list[trans.transid].add(i)
-            else:
+            if var not in wait_list:
+                wait_list[var] = []
+            if trans.transid not in block_list:
                 block_list[trans.transid] = set()
+            if len(wait_list[var]) == 0:
                 for i in self.locktable[var][1]:
-                    block_list[trans.transid].add(i)
+                    if i != trans.transid:
+                        block_list[trans.transid].add(i)
+            else:
+                sublist = wait_list[var]
+                idx = len(sublist)-1
+                item = sublist[idx]
+                if item.op.op_type == "W":
+                    if item != trans:
+                        block_list[trans.transid].add(item.transid)
+                else:
+                    if trans.op.op_type == "R":
+                        block_list[trans.transid] = [ele for ele in block_list[item.transid]]
+                    else:
+                        while(idx >= 0 and sublist[idx].op.op_type=="R"):
+                            if trans != sublist[idx]:
+                                block_list[trans.transid].add(item.transid)
+                            idx-=1
+            if trans not in wait_list[var]:
+                wait_list[var].append(trans)
+                
             return False
 
     def dump(self):
@@ -161,12 +181,13 @@ class Site:
         unlock all the lock made by the target transaction
         Author: Xinsen Lu
         input: transaction
-        output: None
+        output: return_list
         side effect: None
         """
         #clean lock
         id = transaction.transid
         keys = []
+        return_list = None
         for key, value in self.locktable.items():
             if id in value[1]:
                 value[1].remove(id)
@@ -176,24 +197,33 @@ class Site:
             _ =  self.locktable.pop(key, None)
         #clean buffer
         if transaction.ifabort == False:
-            self.commit_trans(id, transaction.endtime)
+            return_list = self.commit_trans(id, transaction.endtime)
         _ = self.buffer.pop(id, None)
-        return
+        return return_list
 
     def commit_trans(self, trans_id, time):
         """
         commit all the update made by the target transaction
         Author: Xinsen Lu
         input: trans_id
-        output: None
+        output: return_list
         side effect: None
         """
+
+        return_list = set()
         #variable update
         if trans_id in self.buffer:
             for key, value in self.buffer[trans_id].items():
                 # minus one because variable ranges from 0 to 19 in self.variable
                 self.variable[key-1] = value
+                if key%2==0:
+                    self.read_available[(key-1)//2]=True
+                    if key in self.recovered_map:
+                        return_list.update(self.recovered_map[key])
+
         #pre-version update
         self.pre_version[time] = []
         for i in range(len(self.variable)):
             self.pre_version[time].append(self.variable[i])
+    
+        return return_list
